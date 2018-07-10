@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans                               
+		http://www.springframework.org/schema/beans/spring-beans-4.1.xsd                              
+		http://www.springframework.org/schema/tx                               
+		http://www.springframework.org/schema/tx/spring-tx-4.1.xsd                              
+		http://www.springframework.org/schema/aop                               
+		http://www.springframework.org/schema/aop/spring-aop-4.1.xsd">
+
+	<!-- 引入配置文件 -->
+	<bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:jdbc.properties</value>
+			</list>
+		</property>
+	</bean>
+
+	<!-- 数据源 -->
+	<bean id="dataSource"  class="com.mchange.v2.c3p0.ComboPooledDataSource"  
+	    destroy-method="close">  
+	    <property name="driverClass" value="${jdbc.driverClass}"></property>  
+	    <property name="jdbcUrl" value="${jdbc.url}"></property>  
+	    <property name="user" value="${jdbc.username}"></property>  
+	    <property name="password" value="${jdbc.password}"></property>  
+	    <property name="acquireIncrement" value="10"></property>  
+	    <property name="initialPoolSize" value="1"></property>  
+	    <property name="maxIdleTime" value="600000"></property>  
+	    <property name="maxPoolSize" value="10"></property>  
+	    <property name="minPoolSize" value="1"></property>  	       
+	</bean> 
+
+	<!-- 
+		LocalSessionFactoryBean实现了org.springframework.beans.factory.FactoryBean接口,
+		spring在装配的时候, 如果发现实现了org.springframework.beans.factory.FactoryBean接口, 
+		就会使用FactoryBean#getObject() 方法返回的对象装配,具体的可以看下文档. 
+		如果你想拿到LocalSessionFactoryBean实例, 在id前面加个'&'就可以了,在你的配置文
+		件中BeanFactory.getBean('&sessionFactory')拿到的就是LocalSessionFactoryBean的实例. 
+	 -->
+	<bean id="sessionFactory"
+		class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="packagesToScan" value="com.it.model" />
+		
+		<property name="hibernateProperties">  
+	        <props>  
+	            <prop key="hibernate.dialect">org.hibernate.dialect.MySQLDialect</prop>  
+	            <prop key="hibernate.show_sql">true</prop>  
+	            <prop key="hibernate.cache.use_query_cache">false</prop>  
+	            <prop key="hibernate.hbm2ddl.auto">update</prop>  
+	            <prop key="hibernate.jdbc.use_scrollable_resultset">false</prop>  	            
+	        </props>  
+	    </property>  
+	</bean>
+
+	<!-- 声明式事务 -->
+	<bean id="transactionManager"
+		class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+	<aop:config>
+		<aop:pointcut id="productServiceMethods" expression="execution(* com.it.service..*.*(..))" />
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="productServiceMethods" />
+	</aop:config>
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="create*" propagation="REQUIRED" />
+			<tx:method name="upload*" propagation="REQUIRED" />
+			<tx:method name="update*" propagation="REQUIRED" />
+			<tx:method name="delete*" propagation="REQUIRED" />
+			<tx:method name="*" propagation="SUPPORTS" read-only="true" />
+		</tx:attributes>
+	</tx:advice>
+	
+	<bean name="ticketDao" class="com.it.dao.impl.TicketDaoImpl">
+		<property name="sessionFactory">
+			<ref bean="sessionFactory" />
+		</property>
+	</bean>
+	
+	<bean name="ticketService" class="com.it.service.impl.TicketServiceImpl">
+		<property name="ticketDao">
+			<ref bean="ticketDao" />
+		</property>
+	</bean>
+	
+	<bean name="ticketAction" class="com.it.action.TicketAction">
+		<property name="ticketService">
+			<ref bean="ticketService" />
+		</property> 
+	</bean>
+</beans>
